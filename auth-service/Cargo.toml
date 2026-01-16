@@ -11,6 +11,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 tokio = { version = "1.48.0", features = ["full"] }
 tower-http = { version = "0.6.6", features = ["fs"] }
+uuid = { version = "1.19.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 fake = "4.4.0"

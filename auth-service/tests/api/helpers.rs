@@ -93,30 +93,15 @@ impl TestApp {
     }
 
     pub async fn login(&self, login_body: LoginBody) -> reqwest::Response {
-        self.http_client
-            .post(format!("{}/login", &self.address))
-            .json(&login_body)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+        self.post_impl("/login", &login_body).await
     }
 
     pub async fn signup(&self, signup_body: SignupBody) -> reqwest::Response {
-        self.http_client
-            .post(format!("{}/signup", &self.address))
-            .json(&signup_body)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+        self.post_impl("/signup", &signup_body).await
     }
 
     pub async fn verify_2fa(&self, verify_2fa_body: Verify2FABody) -> reqwest::Response {
-        self.http_client
-            .post(format!("{}/verify-2fa", &self.address))
-            .json(&verify_2fa_body)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+        self.post_impl("/verify-2fa", &verify_2fa_body).await
     }
 
     pub async fn logout(&self, jwt_token: &str) -> reqwest::Response {
@@ -129,9 +114,16 @@ impl TestApp {
     }
 
     pub async fn verify_token(&self, body: VerifyTokenBody) -> reqwest::Response {
+        self.post_impl("/verify-token", &body).await
+    }
+
+    pub async fn post_impl<Body>(&self, path: &str, body: &Body) -> reqwest::Response
+    where
+        Body: Serialize,
+    {
         self.http_client
-            .post(format!("{}/verify-token", &self.address))
-            .json(&body)
+            .post(format!("{}{}", &self.address, path))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
