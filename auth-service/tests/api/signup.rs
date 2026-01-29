@@ -1,3 +1,4 @@
+use auth_service::SignupResponse;
 use fake::{
     faker::internet::en::{Password, SafeEmail},
     Fake,
@@ -16,6 +17,19 @@ async fn signup_returns_201_when_valid_data_provided() {
     let response = app.signup(signup_body).await;
 
     assert_eq!(response.status().as_u16(), 201);
+
+    let expected_response = SignupResponse {
+        message: "User created successfully!".to_owned(),
+    };
+
+    // Assert that we are getting the correct response body!
+    assert_eq!(
+        response
+            .json::<SignupResponse>()
+            .await
+            .expect("Could not deserialize response body to UserBody"),
+        expected_response
+    );
 }
 
 #[tokio::test]

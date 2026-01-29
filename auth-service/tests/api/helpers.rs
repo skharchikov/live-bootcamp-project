@@ -1,4 +1,4 @@
-use auth_service::Application;
+use auth_service::{app_state::AppState, Application};
 use serde::Serialize;
 
 pub struct TestApp {
@@ -67,7 +67,8 @@ impl VerifyTokenBody {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let app = Application::build("127.0.0.1:0")
+        let app_state = AppState::default();
+        let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build app");
 
