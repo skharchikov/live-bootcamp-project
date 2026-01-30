@@ -1,18 +1,17 @@
-use auth_service::SignupResponse;
+use auth_service::{ErrorResponse, SignupRequest, SignupResponse};
 use fake::{
     faker::internet::en::{Password, SafeEmail},
     Fake,
 };
 
-use crate::helpers::SignupBody;
 use crate::helpers::TestApp;
 
 #[tokio::test]
-async fn signup_returns_201_when_valid_data_provided() {
+async fn should_return_201_when_valid_data_provided() {
     let app = TestApp::new().await;
     let email: String = SafeEmail().fake();
     let password: String = Password(8..12).fake();
-    let signup_body = SignupBody::new(password, email, false);
+    let signup_body = SignupRequest::new(password, email, false);
 
     let response = app.signup(signup_body).await;
 
@@ -27,9 +26,34 @@ async fn signup_returns_201_when_valid_data_provided() {
         response
             .json::<SignupResponse>()
             .await
-            .expect("Could not deserialize response body to UserBody"),
+            .expect("Could not deserialize response body to SignupResponse"),
         expected_response
     );
+}
+
+#[tokio::test]
+async fn shuld_return_400_if_invalid_input() {
+    let app = TestApp::new().await;
+    let email: String = SafeEmail().fake();
+
+    let test_cases = [
+        SignupRequest::new("".to_owned(), email.clone(), true),
+        SignupRequest::new("password123".to_owned(), "".to_owned(), false),
+        SignupRequest::new("password123".to_owned(), "invalidemail".to_owned(), true),
+    ];
+
+    for test_case in test_cases.into_iter() {
+        let response = app.signup(test_case).await;
+        assert_eq!(response.status().as_u16(), 400);
+        assert_eq!(
+            response
+                .json::<ErrorResponse>()
+                .await
+                .expect("Could not deserialize response body to ErrorResponse")
+                .error,
+            "Invalid credentials".to_owned()
+        );
+    }
 }
 
 #[tokio::test]
@@ -70,4 +94,29 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+}
+
+#[tokio::test]
+async fn should_return_409_if_email_already_exist() {
+    let app = TestApp::new().await;
+    let email: String = SafeEmail().fake();
+
+    let input = serde_json::json!({
+        "email": email,
+        "password": "password123",
+        "requires2FA": true
+    });
+
+    let response1 = app.post_impl("/signup", &input).await;
+    let response2 = app.post_impl("/signup", &input).await;
+    assert_eq!(response1.status().as_u16(), 201);
+    assert_eq!(response2.status().as_u16(), 409);
+    assert_eq!(
+        response2
+            .json::<ErrorResponse>()
+            .await
+            .expect("Could not deserialize response body to ErrorResponse")
+            .error,
+        "User already exists".to_owned()
+    );
 }

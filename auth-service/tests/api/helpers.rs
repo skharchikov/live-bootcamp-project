@@ -1,4 +1,4 @@
-use auth_service::{app_state::AppState, Application};
+use auth_service::{app_state::AppState, Application, SignupRequest};
 use serde::Serialize;
 
 pub struct TestApp {
@@ -15,24 +15,6 @@ pub struct LoginBody {
 impl LoginBody {
     pub fn new(email: String, password: String) -> Self {
         Self { email, password }
-    }
-}
-
-#[derive(Serialize)]
-pub struct SignupBody {
-    pub password: String,
-    pub email: String,
-    #[serde(rename = "requires2FA")]
-    pub requires_2fa: bool,
-}
-
-impl SignupBody {
-    pub fn new(password: String, email: String, requires_2fa: bool) -> Self {
-        Self {
-            password,
-            email,
-            requires_2fa,
-        }
     }
 }
 
@@ -97,7 +79,7 @@ impl TestApp {
         self.post_impl("/login", &login_body).await
     }
 
-    pub async fn signup(&self, signup_body: SignupBody) -> reqwest::Response {
+    pub async fn signup(&self, signup_body: SignupRequest) -> reqwest::Response {
         self.post_impl("/signup", &signup_body).await
     }
 
