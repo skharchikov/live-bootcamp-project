@@ -12,9 +12,9 @@ use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 pub mod app_state;
-mod domain;
-mod routes;
-mod services;
+pub mod domain;
+pub mod routes;
+pub mod services;
 
 pub use domain::*;
 pub use routes::*;
