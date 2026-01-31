@@ -10,7 +10,7 @@ use crate::helpers::TestApp;
 async fn should_return_201_when_valid_data_provided() {
     let app = TestApp::new().await;
     let email: String = SafeEmail().fake();
-    let password: String = Password(8..12).fake();
+    let password = "ValidPass1!".to_owned();
     let signup_body = SignupRequest::new(password, email, false);
 
     let response = app.signup(signup_body).await;
@@ -103,7 +103,7 @@ async fn should_return_409_if_email_already_exist() {
 
     let input = serde_json::json!({
         "email": email,
-        "password": "password123",
+        "password": "ValidPass1!",
         "requires2FA": true
     });
 
