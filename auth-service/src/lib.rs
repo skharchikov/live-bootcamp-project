@@ -15,9 +15,11 @@ pub mod app_state;
 pub mod domain;
 pub mod routes;
 pub mod services;
+pub mod utils;
 
 pub use domain::*;
 pub use routes::*;
+pub use utils::*;
 
 use crate::app_state::AppState;
 
