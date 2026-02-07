@@ -1,5 +1,5 @@
 use crate::helpers::TestApp;
-use auth_service::{ErrorResponse, JWT_COOKIE_NAME};
+use auth_service::{ErrorResponse, LoginRequest, SignupRequest, JWT_COOKIE_NAME};
 use fake::{faker::internet::en::SafeEmail, Fake};
 use serde_json::json;
 
@@ -69,23 +69,14 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
     let app = TestApp::new().await;
 
     let email: String = SafeEmail().fake();
+    let signup_body = SignupRequest::new("ValidPass1!".to_string(), email.clone(), false);
 
-    let signup_body = serde_json::json!({
-        "email": email,
-        "password": "ValidPass1!",
-        "requires2FA": false
-    });
-
-    let response = app.post_impl("/signup", &signup_body).await;
+    let response = app.signup(&signup_body).await;
 
     assert_eq!(response.status().as_u16(), 201);
 
-    let login_body = serde_json::json!({
-        "email": email,
-        "password": "ValidPass1!"
-    });
-
-    let response = app.post_impl("/login", &login_body).await;
+    let login_body = LoginRequest::new(email, "ValidPass1!".to_string());
+    let response = app.login(&login_body).await;
 
     assert_eq!(response.status().as_u16(), 200);
 

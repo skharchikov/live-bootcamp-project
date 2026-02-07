@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use axum::{
-    http::StatusCode,
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     serve::Serve,
@@ -9,9 +9,10 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub mod app_state;
+pub mod config;
 pub mod domain;
 pub mod routes;
 pub mod services;
@@ -21,7 +22,7 @@ pub use domain::*;
 pub use routes::*;
 pub use utils::*;
 
-use crate::app_state::AppState;
+use crate::{app_state::AppState, config::AppConfig};
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -32,17 +33,32 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
-        let assets_dir = ServeDir::new("assets");
+    pub async fn build(app_state: AppState, config: AppConfig) -> Result<Self, Box<dyn Error>> {
+        let allowed_origins = config
+            .cors
+            .allowed_origins()
+            .into_iter()
+            .map(|origin| origin.parse())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let cors = CorsLayer::new()
+            // Allow GET and POST requests
+            .allow_methods([Method::GET, Method::POST])
+            // Allow cookies to be included in requests
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
+
         let router = Router::new()
+            .fallback_service(ServeDir::new("assets"))
             .route("/signup", post(signup))
             .route("/login", post(login))
-            .route("/verify-token", post(verify_token))
-            .route("/logout", post(logout))
             .route("/verify-2fa", post(verify_2fa))
+            .route("/logout", post(logout))
+            .route("/verify-token", post(verify_token))
             .with_state(app_state)
-            .fallback_service(assets_dir);
+            .layer(cors); // Add CORS config to our Axum router
 
+        let address = format!("{}:{}", config.host, config.port);
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
         let server = axum::serve(listener, router);
@@ -64,6 +80,8 @@ pub struct ErrorResponse {
 impl IntoResponse for AuthAPIError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid auth token"),
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing auth token"),
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
             AuthAPIError::IncorrectCredentials => {

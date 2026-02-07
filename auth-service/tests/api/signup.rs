@@ -1,8 +1,5 @@
 use auth_service::{ErrorResponse, SignupRequest, SignupResponse};
-use fake::{
-    faker::internet::en::{Password, SafeEmail},
-    Fake,
-};
+use fake::{faker::internet::en::SafeEmail, Fake};
 
 use crate::helpers::TestApp;
 
@@ -13,7 +10,7 @@ async fn should_return_201_when_valid_data_provided() {
     let password = "ValidPass1!".to_owned();
     let signup_body = SignupRequest::new(password, email, false);
 
-    let response = app.signup(signup_body).await;
+    let response = app.signup(&signup_body).await;
 
     assert_eq!(response.status().as_u16(), 201);
 
@@ -42,7 +39,7 @@ async fn shuld_return_400_if_invalid_input() {
         SignupRequest::new("password123".to_owned(), "invalidemail".to_owned(), true),
     ];
 
-    for test_case in test_cases.into_iter() {
+    for test_case in test_cases.iter() {
         let response = app.signup(test_case).await;
         assert_eq!(response.status().as_u16(), 400);
         assert_eq!(

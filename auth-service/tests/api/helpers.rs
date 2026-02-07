@@ -1,27 +1,19 @@
+use reqwest::cookie::Jar;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::{
-    app_state::AppState, services::hashmap_user_service::HashmapUserStore, Application,
-    SignupRequest,
+    app_state::AppState,
+    config::{AppConfig, CorsConfig},
+    services::hashmap_user_service::HashmapUserStore,
+    Application, LoginRequest, SignupRequest,
 };
 use serde::Serialize;
 
 pub struct TestApp {
     pub address: String,
+    pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
-}
-
-#[derive(Serialize)]
-pub struct LoginBody {
-    pub email: String,
-    pub password: String,
-}
-
-impl LoginBody {
-    pub fn new(email: String, password: String) -> Self {
-        Self { email, password }
-    }
 }
 
 #[derive(Serialize)]
@@ -57,7 +49,14 @@ impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let app_state = AppState::new(user_store);
-        let app = Application::build(app_state, "127.0.0.1:0")
+        let config = AppConfig {
+            host: "127.0.0.1".parse().unwrap(),
+            port: 0, // Use port 0 to let the OS assign an available port.
+            cors: CorsConfig {
+                allowed_origins: "http://localhost:8000".to_string(),
+            },
+        };
+        let app = Application::build(app_state, config)
             .await
             .expect("Failed to build app");
 
@@ -66,10 +65,15 @@ impl TestApp {
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
-        let http_client = reqwest::Client::new();
+        let cookie_jar = Arc::new(Jar::default());
+        let http_client = reqwest::Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
 
         Self {
             address,
+            cookie_jar,
             http_client,
         }
     }
@@ -82,22 +86,21 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn login(&self, login_body: LoginBody) -> reqwest::Response {
-        self.post_impl("/login", &login_body).await
+    pub async fn login(&self, login_body: &LoginRequest) -> reqwest::Response {
+        self.post_impl("/login", login_body).await
     }
 
-    pub async fn signup(&self, signup_body: SignupRequest) -> reqwest::Response {
-        self.post_impl("/signup", &signup_body).await
+    pub async fn signup(&self, signup_body: &SignupRequest) -> reqwest::Response {
+        self.post_impl("/signup", signup_body).await
     }
 
     pub async fn verify_2fa(&self, verify_2fa_body: Verify2FABody) -> reqwest::Response {
         self.post_impl("/verify-2fa", &verify_2fa_body).await
     }
 
-    pub async fn logout(&self, jwt_token: &str) -> reqwest::Response {
+    pub async fn logout(&self) -> reqwest::Response {
         self.http_client
             .post(format!("{}/logout", &self.address))
-            .form(&[("jwt", jwt_token)])
             .send()
             .await
             .expect("Failed to execute request.")

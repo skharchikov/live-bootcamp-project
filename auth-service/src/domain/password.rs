@@ -43,8 +43,9 @@ impl AsRef<str> for Password {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    pub use super::*;
+    use super::*;
 
     #[test]
     fn short_password_is_rejected() {
