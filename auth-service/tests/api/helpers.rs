@@ -6,7 +6,7 @@ use auth_service::{
     app_state::AppState,
     config::{AppConfig, CorsConfig},
     services::hashmap_user_service::HashmapUserStore,
-    Application, LoginRequest, SignupRequest,
+    Application, LoginRequest, SignupRequest, VerifyTokenRequest,
 };
 use serde::Serialize;
 
@@ -31,17 +31,6 @@ impl Verify2FABody {
             login_attempt_id,
             email,
         }
-    }
-}
-
-#[derive(Serialize)]
-pub struct VerifyTokenBody {
-    pub token: String,
-}
-
-impl VerifyTokenBody {
-    pub fn new(token: String) -> Self {
-        Self { token }
     }
 }
 
@@ -106,7 +95,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn verify_token(&self, body: VerifyTokenBody) -> reqwest::Response {
+    pub async fn verify_token(&self, body: &VerifyTokenRequest) -> reqwest::Response {
         self.post_impl("/verify-token", &body).await
     }
 
