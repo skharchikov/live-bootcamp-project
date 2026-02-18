@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use confique::Config;
 
-#[derive(Config)]
+#[derive(Config, Debug)]
 pub struct AppConfig {
     #[config(env = "APP_HOST")]
     pub host: IpAddr,
@@ -19,7 +19,7 @@ impl AppConfig {
         match dotenvy::dotenv() {
             Ok(_) => (),
             Err(e) => {
-                eprintln!("Warning: Failed to load .env file: {e}");
+                tracing::warn!("Failed to load .env file: {e}");
                 // Continue without .env file, environment variables may still be set.
             }
         }
@@ -27,7 +27,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Config)]
+#[derive(Config, Debug)]
 pub struct CorsConfig {
     #[config(env = "CORS_ALLOWED_ORIGINS")]
     pub allowed_origins: String,
