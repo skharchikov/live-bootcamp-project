@@ -20,6 +20,7 @@ impl LoginRequest {
     }
 }
 
+#[tracing::instrument(name = "Login", skip(state, jar, request))]
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,

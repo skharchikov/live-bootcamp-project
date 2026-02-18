@@ -26,6 +26,7 @@ pub struct SignupResponse {
     pub message: String,
 }
 
+#[tracing::instrument(name = "Signup", skip(state, request))]
 pub async fn signup(
     State(state): State<AppState>,
     Json(request): Json<SignupRequest>,

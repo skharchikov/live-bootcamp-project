@@ -14,6 +14,7 @@ impl VerifyTokenRequest {
     }
 }
 
+#[tracing::instrument(name = "Verify Token", skip(state, request))]
 pub async fn verify_token(
     State(state): State<AppState>,
     Json(request): Json<VerifyTokenRequest>,

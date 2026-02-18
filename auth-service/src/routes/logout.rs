@@ -5,6 +5,7 @@ use axum_extra::extract::{cookie::Cookie, CookieJar};
 use crate::Token;
 use crate::{app_state::AppState, validate_token, AuthAPIError, JWT_COOKIE_NAME};
 
+#[tracing::instrument(name = "Logout", skip(state, jar))]
 pub async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
