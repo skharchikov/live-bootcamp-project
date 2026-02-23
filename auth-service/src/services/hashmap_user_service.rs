@@ -72,7 +72,6 @@ mod tests {
 
         let insert_result = store.add_user(user.clone()).await;
         assert_eq!(insert_result, Ok(()));
-        println!("Map state: {:?}", store.users);
 
         let result = store
             .get_user(&Email::parse("test@gmail.com").unwrap())
