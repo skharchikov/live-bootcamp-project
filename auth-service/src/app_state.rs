@@ -1,22 +1,29 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::UserStore;
+use crate::{BannedTokenStore, TwoFactorAuthCodeStore, UserStore};
 
-pub type UserStoreType = Arc<RwLock<dyn UserStore + Send + Sync>>;
-pub type BannedTokenStoreType = Arc<RwLock<dyn crate::BannedTokenStore + Send + Sync>>;
+pub type UserStoreType = Arc<RwLock<dyn UserStore>>;
+pub type BannedTokenStoreType = Arc<RwLock<dyn BannedTokenStore>>;
+pub type TwoFactorAuthCodeStoreType = Arc<RwLock<dyn TwoFactorAuthCodeStore>>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub user_store: UserStoreType,
     pub banned_token_store: BannedTokenStoreType,
+    pub two_fa_code_store: TwoFactorAuthCodeStoreType,
 }
 
 impl AppState {
-    pub fn new(user_store: UserStoreType, banned_token_store: BannedTokenStoreType) -> Self {
+    pub fn new(
+        user_store: UserStoreType,
+        banned_token_store: BannedTokenStoreType,
+        two_fa_code_store: TwoFactorAuthCodeStoreType,
+    ) -> Self {
         Self {
             user_store,
             banned_token_store,
+            two_fa_code_store,
         }
     }
 }

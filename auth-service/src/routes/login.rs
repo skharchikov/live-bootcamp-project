@@ -5,8 +5,8 @@ use axum::Json;
 use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
-use crate::app_state::AppState;
-use crate::{generate_auth_cookie, AuthAPIError, Email, Password};
+use crate::app_state::{self, AppState};
+use crate::{generate_auth_cookie, AuthAPIError, Email, LoginAttemptId, Password, TwoFACode};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -18,6 +18,20 @@ impl LoginRequest {
     pub fn new(email: String, password: String) -> Self {
         Self { email, password }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum LoginResponse {
+    RegularAuth,
+    TwoFactorAuth(TwoFactorAuthResponse),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TwoFactorAuthResponse {
+    pub message: String,
+    #[serde(rename = "loginAttemptId")]
+    pub login_attempt_id: String,
 }
 
 #[tracing::instrument(name = "Login", skip(state, jar, request))]
@@ -50,12 +64,60 @@ pub async fn login(
         Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
     };
 
-    let auth_cookie = match generate_auth_cookie(&user.email) {
+    match user.requires_2fa {
+        true => handle_2fa(&user.email, &state, jar).await,
+        false => handle_no_2fa(&user.email, jar),
+    }
+}
+
+async fn handle_2fa(
+    email: &Email,
+    app_state: &AppState,
+    jar: CookieJar,
+) -> (
+    CookieJar,
+    Result<(StatusCode, Json<LoginResponse>), AuthAPIError>,
+) {
+    let login_attempt_id = LoginAttemptId::default();
+    let two_fa_code = TwoFACode::default();
+
+    if app_state
+        .two_fa_code_store
+        .write()
+        .await
+        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
+        .await
+        .is_err()
+    {
+        return (jar, Err(AuthAPIError::UnexpectedError));
+    }
+
+    (
+        jar,
+        Ok((
+            StatusCode::from_u16(206).unwrap(),
+            Json(LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
+                message: "2FA required".to_string(),
+                login_attempt_id: login_attempt_id.to_string(),
+            })),
+        )),
+    )
+}
+
+fn handle_no_2fa(
+    email: &Email,
+    jar: CookieJar,
+) -> (
+    CookieJar,
+    Result<(StatusCode, Json<LoginResponse>), AuthAPIError>,
+) {
+    let auth_cookie = match generate_auth_cookie(email) {
         Ok(cookie) => cookie,
         Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
     };
 
     let updated_jar = jar.add(auth_cookie);
+    let response = LoginResponse::RegularAuth;
 
-    (updated_jar, Ok(StatusCode::OK.into_response()))
+    (updated_jar, Ok((StatusCode::OK, Json(response))))
 }

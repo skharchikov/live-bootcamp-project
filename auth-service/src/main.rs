@@ -2,7 +2,9 @@ use auth_service::config::AppConfig;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use auth_service::services::{HashmapUserStore, HashsetBannedTokenStore};
+use auth_service::services::{
+    HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore,
+};
 use auth_service::{app_state::AppState, Application};
 
 #[tokio::main]
@@ -14,7 +16,8 @@ async fn main() {
 
     let rw_user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
     let rw_banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
-    let app_state = AppState::new(rw_user_store, rw_banned_token_store);
+    let rw_two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
+    let app_state = AppState::new(rw_user_store, rw_banned_token_store, rw_two_fa_code_store);
     let app = Application::build(app_state, config)
         .await
         .expect("Failed to build app");

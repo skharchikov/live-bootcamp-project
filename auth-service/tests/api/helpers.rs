@@ -3,9 +3,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::{
-    app_state::{AppState, BannedTokenStoreType},
+    app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
     config::{AppConfig, CorsConfig},
-    services::{HashmapUserStore, HashsetBannedTokenStore},
+    services::{HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore},
     Application, LoginRequest, SignupRequest, VerifyTokenRequest,
 };
 use serde::Serialize;
@@ -15,6 +15,7 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
+    pub two_fa_code_store: TwoFactorAuthCodeStoreType,
 }
 
 #[derive(Serialize)]
@@ -39,7 +40,12 @@ impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
-        let app_state = AppState::new(user_store, banned_token_store.clone());
+        let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
+        let app_state = AppState::new(
+            user_store,
+            banned_token_store.clone(),
+            two_fa_code_store.clone(),
+        );
         let config = AppConfig {
             host: "127.0.0.1".parse().unwrap(),
             port: 0, // Use port 0 to let the OS assign an available port.
@@ -67,6 +73,7 @@ impl TestApp {
             cookie_jar,
             http_client,
             banned_token_store,
+            two_fa_code_store,
         }
     }
 
