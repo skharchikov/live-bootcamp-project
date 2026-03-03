@@ -1,7 +1,7 @@
 use validator::*;
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
-pub struct Email(pub String);
+pub struct Email(String);
 
 impl Email {
     pub fn parse(email: &str) -> Result<Self, String> {

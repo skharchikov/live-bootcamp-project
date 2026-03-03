@@ -39,6 +39,7 @@ impl TwoFactorAuthCodeStore for HashMapTwoFactorAuthCodeStore {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

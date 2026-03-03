@@ -19,6 +19,7 @@ impl BannedTokenStore for HashsetBannedTokenStore {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
