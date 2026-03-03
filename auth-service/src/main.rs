@@ -17,7 +17,7 @@ async fn main() {
     let rw_user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
     let rw_banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
     let rw_two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
-    let email_client = Arc::new(MockEmailClient);
+    let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
     let app_state = AppState::new(
         rw_user_store,
         rw_banned_token_store,

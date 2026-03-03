@@ -14,3 +14,6 @@ fmt SERVICE:
 test-all:
     cargo test --manifest-path auth-service/Cargo.toml
     cargo test --manifest-path app-service/Cargo.toml
+
+# Run fmt, lint, and test all services
+check-all: fmt-all test-all

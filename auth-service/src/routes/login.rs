@@ -6,9 +6,9 @@ use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
-use crate::{generate_auth_cookie, AuthAPIError, Email, LoginAttemptId, Password, TwoFACode};
-
-const SUBJECT: &str = "Your 2FA Code";
+use crate::{
+    generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, Password, TwoFACode,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -97,7 +97,9 @@ async fn handle_2fa(
     let content = format!("Your 2FA code is: {}", two_fa_code.as_ref());
     if app_state
         .email_client
-        .send_email(email, SUBJECT, &content)
+        .write()
+        .await
+        .send_email(email, EmailPayload::TWO_FA_SUBJECT, &content)
         .await
         .is_err()
     {

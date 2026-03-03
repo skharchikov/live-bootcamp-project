@@ -18,7 +18,7 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFactorAuthCodeStoreType,
-    pub email_client: EmailClientType,
+    pub email_client: Arc<RwLock<MockEmailClient>>,
 }
 
 #[derive(Serialize)]
@@ -44,7 +44,7 @@ impl TestApp {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
         let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
-        let email_client = Arc::new(MockEmailClient);
+        let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
         let app_state = AppState::new(
             user_store,
             banned_token_store.clone(),

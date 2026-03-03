@@ -6,7 +6,7 @@ use crate::{BannedTokenStore, TwoFactorAuthCodeStore, UserStore};
 pub type UserStoreType = Arc<RwLock<dyn UserStore>>;
 pub type BannedTokenStoreType = Arc<RwLock<dyn BannedTokenStore>>;
 pub type TwoFactorAuthCodeStoreType = Arc<RwLock<dyn TwoFactorAuthCodeStore>>;
-pub type EmailClientType = Arc<dyn crate::EmailClient>;
+pub type EmailClientType = Arc<RwLock<dyn crate::EmailClient>>;
 
 #[derive(Clone)]
 pub struct AppState {

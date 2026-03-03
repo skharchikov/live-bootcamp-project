@@ -1,5 +1,7 @@
 use validator::*;
 
+use crate::TwoFACode;
+
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub struct Email(String);
 
@@ -24,6 +26,25 @@ impl TryFrom<&str> for Email {
 impl AsRef<str> for Email {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EmailPayload {
+    pub recipient: Email,
+    pub subject: String,
+    pub content: String,
+}
+
+impl EmailPayload {
+    pub const TWO_FA_SUBJECT: &'static str = "Your 2FA Code";
+
+    pub fn two_fa_code(recipient: &Email, code: &TwoFACode) -> Self {
+        EmailPayload {
+            recipient: recipient.clone(),
+            subject: Self::TWO_FA_SUBJECT.to_string(),
+            content: format!("Your 2FA code is: {}", code.as_ref()),
+        }
     }
 }
 
