@@ -5,8 +5,10 @@ use axum::Json;
 use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
-use crate::app_state::{self, AppState};
-use crate::{generate_auth_cookie, AuthAPIError, Email, LoginAttemptId, Password, TwoFACode};
+use crate::app_state::AppState;
+use crate::{
+    generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, Password, TwoFACode,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -92,16 +94,30 @@ async fn handle_2fa(
         return (jar, Err(AuthAPIError::UnexpectedError));
     }
 
-    (
-        jar,
-        Ok((
-            StatusCode::from_u16(206).unwrap(),
-            Json(LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
-                message: "2FA required".to_string(),
-                login_attempt_id: login_attempt_id.to_string(),
-            })),
-        )),
-    )
+    let content = format!("Your 2FA code is: {}", two_fa_code.as_ref());
+    if app_state
+        .email_client
+        .write()
+        .await
+        .send_email(email, EmailPayload::TWO_FA_SUBJECT, &content)
+        .await
+        .is_err()
+    {
+        tracing::error!(
+            "Error sending 2FA code email to {}: {}",
+            email.as_ref(),
+            two_fa_code.as_ref()
+        );
+        return (jar, Err(AuthAPIError::UnexpectedError));
+    };
+    let response = Json(LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
+        message: "2FA required".to_string(),
+        login_attempt_id: {
+            let this = &login_attempt_id;
+            this.0.clone()
+        },
+    }));
+    (jar, Ok((StatusCode::from_u16(206).unwrap(), response)))
 }
 
 fn handle_no_2fa(

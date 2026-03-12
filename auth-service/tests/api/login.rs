@@ -121,4 +121,14 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         .get_code(&Email::parse(&login_body.email).unwrap())
         .await
         .expect("2FA code should be stored for the user");
+
+    let email = Email::parse(&login_body.email).unwrap();
+    app.email_client
+        .read()
+        .await
+        .sent
+        .read()
+        .await
+        .get(&email)
+        .expect("Sent email should be recorded in the mock email client");
 }

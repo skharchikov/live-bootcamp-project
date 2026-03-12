@@ -16,6 +16,12 @@ impl TwoFACode {
     }
 }
 
+impl AsRef<str> for TwoFACode {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Default for TwoFACode {
     fn default() -> Self {
         let code = rand::rng().random_range(100000u32..=999999);

@@ -3,9 +3,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::{
-    app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
+    app_state::{AppState, BannedTokenStoreType, EmailClientType, TwoFactorAuthCodeStoreType},
     config::{AppConfig, CorsConfig},
-    services::{HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore},
+    services::{
+        HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient,
+    },
     Application, LoginRequest, SignupRequest, VerifyTokenRequest,
 };
 use serde::Serialize;
@@ -16,6 +18,7 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFactorAuthCodeStoreType,
+    pub email_client: Arc<RwLock<MockEmailClient>>,
 }
 
 #[derive(Serialize)]
@@ -41,10 +44,12 @@ impl TestApp {
         let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
         let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
+        let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
         let app_state = AppState::new(
             user_store,
             banned_token_store.clone(),
             two_fa_code_store.clone(),
+            email_client.clone(),
         );
         let config = AppConfig {
             host: "127.0.0.1".parse().unwrap(),
@@ -74,6 +79,7 @@ impl TestApp {
             http_client,
             banned_token_store,
             two_fa_code_store,
+            email_client,
         }
     }
 
