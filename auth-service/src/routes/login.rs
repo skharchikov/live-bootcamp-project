@@ -114,7 +114,7 @@ async fn handle_2fa(
         message: "2FA required".to_string(),
         login_attempt_id: {
             let this = &login_attempt_id;
-            this.0.clone()
+            this.as_ref().to_owned()
         },
     }));
     (jar, Ok((StatusCode::from_u16(206).unwrap(), response)))

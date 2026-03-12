@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct LoginAttemptId(pub String);
+pub struct LoginAttemptId(String);
 
 impl LoginAttemptId {
     pub fn parse(id: &str) -> Result<Self, String> {
@@ -14,5 +14,11 @@ impl LoginAttemptId {
 impl Default for LoginAttemptId {
     fn default() -> Self {
         LoginAttemptId(uuid::Uuid::now_v7().to_string())
+    }
+}
+
+impl AsRef<str> for LoginAttemptId {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
