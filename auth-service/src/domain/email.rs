@@ -6,8 +6,8 @@ use crate::TwoFACode;
 pub struct Email(String);
 
 impl Email {
-    pub fn parse(email: &str) -> Result<Self, String> {
-        email.try_into()
+    pub fn parse(email: impl AsRef<str>) -> Result<Self, String> {
+        email.as_ref().try_into()
     }
 }
 

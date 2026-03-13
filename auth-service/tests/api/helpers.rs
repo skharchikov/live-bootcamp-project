@@ -3,14 +3,19 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::{
-    app_state::{AppState, BannedTokenStoreType, EmailClientType, TwoFactorAuthCodeStoreType},
+    app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
     config::{AppConfig, CorsConfig},
     services::{
         HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient,
     },
-    Application, LoginRequest, SignupRequest, VerifyTokenRequest,
+    Application, LoginRequest, SignupRequest, Verify2FARequest, VerifyTokenRequest,
 };
+use fake::{faker::internet::en::SafeEmail, Fake};
 use serde::Serialize;
+
+pub fn get_random_email() -> String {
+    SafeEmail().fake()
+}
 
 pub struct TestApp {
     pub address: String,
@@ -19,24 +24,6 @@ pub struct TestApp {
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFactorAuthCodeStoreType,
     pub email_client: Arc<RwLock<MockEmailClient>>,
-}
-
-#[derive(Serialize)]
-pub struct Verify2FABody {
-    #[serde(rename = "2FACode")]
-    pub code: String,
-    pub login_attempt_id: String,
-    pub email: String,
-}
-
-impl Verify2FABody {
-    pub fn new(code: String, login_attempt_id: String, email: String) -> Self {
-        Self {
-            code,
-            login_attempt_id,
-            email,
-        }
-    }
 }
 
 impl TestApp {
@@ -99,8 +86,20 @@ impl TestApp {
         self.post_impl("/signup", signup_body).await
     }
 
-    pub async fn verify_2fa(&self, verify_2fa_body: Verify2FABody) -> reqwest::Response {
-        self.post_impl("/verify-2fa", &verify_2fa_body).await
+    pub async fn verify_2fa(&self, verify_2fa_body: &Verify2FARequest) -> reqwest::Response {
+        self.post_impl("/verify-2fa", verify_2fa_body).await
+    }
+
+    pub async fn post_signup<Body: Serialize>(&self, body: &Body) -> reqwest::Response {
+        self.post_impl("/signup", body).await
+    }
+
+    pub async fn post_login<Body: Serialize>(&self, body: &Body) -> reqwest::Response {
+        self.post_impl("/login", body).await
+    }
+
+    pub async fn post_verify_2fa<Body: Serialize>(&self, body: &Body) -> reqwest::Response {
+        self.post_impl("/verify-2fa", body).await
     }
 
     pub async fn logout(&self) -> reqwest::Response {
