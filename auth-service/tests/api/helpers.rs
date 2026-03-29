@@ -44,6 +44,12 @@ impl TestApp {
             cors: CorsConfig {
                 allowed_origins: "http://localhost:8000".to_string(),
             },
+            postgres: auth_service::config::PostgresConfig {
+                username: "test_user".to_string(),
+                password: "test_password".to_string(),
+                db: "test_db".to_string(),
+                max_connections: 5,
+            },
         };
         let app = Application::build(app_state, config)
             .await

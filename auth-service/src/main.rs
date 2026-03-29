@@ -1,4 +1,6 @@
-use auth_service::config::AppConfig;
+use auth_service::config::{AppConfig, PostgresConfig};
+use auth_service::get_postgres_pool;
+use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -12,7 +14,16 @@ async fn main() {
     init_tracing();
 
     let config = AppConfig::load().expect("Failed to load configuration");
-    tracing::info!("Configuration loaded: {:?}", &config);
+    tracing::info!(
+        host = %config.host,
+        port = %config.port,
+        cors_allowed_origins = %config.cors.allowed_origins,
+        postgres_host = %config.postgres.host,
+        postgres_user = %config.postgres.username,
+        postgres_db = %config.postgres.db,
+        "Configuration loaded"
+    );
+    let pg_pool = configure_postgresql(&config.postgres).await;
 
     let rw_user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
     let rw_banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
@@ -35,4 +46,17 @@ fn init_tracing() {
     use tracing_subscriber::prelude::*;
     let fmt_layer = tracing_subscriber::fmt::layer().with_target(false);
     tracing_subscriber::registry().with(fmt_layer).init();
+}
+
+async fn configure_postgresql(config: &PostgresConfig) -> PgPool {
+    let pg_pool = get_postgres_pool(config)
+        .await
+        .expect("Failed to create PostgreSQL connection pool");
+
+    sqlx::migrate!("./migrations")
+        .run(&pg_pool)
+        .await
+        .expect("Failed to run database migrations");
+
+    pg_pool
 }

@@ -10,6 +10,8 @@ pub struct AppConfig {
     pub port: u16,
     #[config(nested)]
     pub cors: CorsConfig,
+    #[config(nested)]
+    pub postgres: PostgresConfig,
 }
 
 impl AppConfig {
@@ -36,5 +38,28 @@ pub struct CorsConfig {
 impl CorsConfig {
     pub fn allowed_origins(&self) -> Vec<&str> {
         self.allowed_origins.split(',').map(str::trim).collect()
+    }
+}
+
+#[derive(Config, Debug)]
+pub struct PostgresConfig {
+    #[config(env = "POSTGRES_HOST", default = "localhost")]
+    pub host: String,
+    #[config(env = "POSTGRES_USER")]
+    pub username: String,
+    #[config(env = "POSTGRES_PASSWORD")]
+    pub password: String,
+    #[config(env = "POSTGRES_DB")]
+    pub db: String,
+    #[config(env = "POSTGRES_MAX_CONNECTIONS", default = 5)]
+    pub max_connections: u16,
+}
+
+impl PostgresConfig {
+    pub fn connection_string(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:5432/{}",
+            self.username, self.password, self.host, self.db
+        )
     }
 }
