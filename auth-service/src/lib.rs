@@ -8,6 +8,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
@@ -22,7 +23,10 @@ pub use domain::*;
 pub use routes::*;
 pub use utils::*;
 
-use crate::{app_state::AppState, config::AppConfig};
+use crate::{
+    app_state::AppState,
+    config::{AppConfig, PostgresConfig},
+};
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -96,4 +100,11 @@ impl IntoResponse for AuthAPIError {
         });
         (status, body).into_response()
     }
+}
+
+pub async fn get_postgres_pool(config: &PostgresConfig) -> Result<sqlx::PgPool, sqlx::Error> {
+    PgPoolOptions::new()
+        .max_connections(config.max_connections.into())
+        .connect(&config.connection_string())
+        .await
 }

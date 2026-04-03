@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
-    config::{AppConfig, CorsConfig},
+    config::{AppConfig, CorsConfig, PostgresConfig},
     services::{
         HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient,
     },
@@ -43,6 +43,13 @@ impl TestApp {
             port: 0, // Use port 0 to let the OS assign an available port.
             cors: CorsConfig {
                 allowed_origins: "http://localhost:8000".to_string(),
+            },
+            postgres: PostgresConfig {
+                host: "test_host".to_string(),
+                username: "test_user".to_string(),
+                password: "test_password".to_string(),
+                db: "test_db".to_string(),
+                max_connections: 5,
             },
         };
         let app = Application::build(app_state, config)
