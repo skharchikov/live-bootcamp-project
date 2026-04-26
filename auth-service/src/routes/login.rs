@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::{
-    generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, Password, TwoFACode,
+    generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, TwoFACode,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -50,14 +50,11 @@ pub async fn login(
         }
     };
 
-    let password = match Password::parse(&request.password) {
-        Ok(pwd) => pwd,
-        Err(_) => {
-            return (jar, Err(AuthAPIError::InvalidCredentials));
-        }
-    };
-
-    if user_store.validate_user(&email, &password).await.is_err() {
+    if user_store
+        .validate_user(&email, &request.password)
+        .await
+        .is_err()
+    {
         return (jar, Err(AuthAPIError::IncorrectCredentials));
     }
 
