@@ -1,4 +1,4 @@
-use crate::{Email, LoginAttemptId, Password, Token, TwoFACode, User};
+use crate::{Email, LoginAttemptId, Token, TwoFACode, User};
 
 #[derive(Debug, PartialEq)]
 pub enum UserStoreError {
@@ -24,8 +24,7 @@ pub enum TwoFactorAuthCodeStoreError {
 pub trait UserStore: Send + Sync {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
-    async fn validate_user(&self, email: &Email, password: &Password)
-        -> Result<(), UserStoreError>;
+    async fn validate_user(&self, email: &Email, raw_password: &str) -> Result<(), UserStoreError>;
 }
 
 #[async_trait::async_trait]
