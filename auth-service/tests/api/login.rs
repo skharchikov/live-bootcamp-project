@@ -4,10 +4,10 @@ use auth_service::{
 };
 use fake::{faker::internet::en::SafeEmail, Fake};
 use serde_json::json;
+use test_helpers::api_test;
 
-#[tokio::test]
+#[api_test]
 async fn should_return_422_if_malformed_credentials() {
-    let app = TestApp::new().await;
     let input = json!({
         "email": "not-an-email"
     });

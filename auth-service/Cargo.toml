@@ -39,3 +39,4 @@ validator = { version = "0.19.0", features = ["derive"] }
 [dev-dependencies]
 fake = "4.4.0"
 reqwest = { version = "0.13.1", features = ["json", "form", "cookies"] }
+test-helpers = { path = "../test-helpers" }
