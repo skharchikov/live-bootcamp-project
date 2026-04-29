@@ -28,8 +28,7 @@ async fn main() {
     let redis_connection = Arc::new(RwLock::new(configure_redis(&config.redis).await));
 
     let rw_user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
-    let rw_banned_token_store =
-        Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_connection)));
+    let rw_banned_token_store = Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_connection)));
     let rw_two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
     let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
     let app_state = AppState::new(
