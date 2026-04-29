@@ -1,21 +1,24 @@
 use reqwest::cookie::Jar;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
     config::{AppConfig, CorsConfig, PostgresConfig},
+    get_postgres_pool,
     services::{
-        HashMapTwoFactorAuthCodeStore, HashmapUserStore, HashsetBannedTokenStore, MockEmailClient,
+        HashMapTwoFactorAuthCodeStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore,
     },
-    Application, LoginRequest, SignupRequest, Verify2FARequest, VerifyTokenRequest,
+    Application, LoginRequest, SignupRequest, VerifyTokenRequest,
 };
 use fake::{faker::internet::en::SafeEmail, Fake};
 use serde::Serialize;
-
-pub fn get_random_email() -> String {
-    SafeEmail().fake()
-}
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    Connection, Executor, PgConnection, PgPool,
+};
 
 pub struct TestApp {
     pub address: String,
@@ -24,11 +27,16 @@ pub struct TestApp {
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFactorAuthCodeStoreType,
     pub email_client: Arc<RwLock<MockEmailClient>>,
+    pub pg_config: PostgresConfig,
+    pub cleanup_called: bool,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
-        let user_store = Arc::new(RwLock::new(HashmapUserStore::default()));
+        let pg_config = load_test_pg_config();
+        let pg_pool = configure_postgresql(&pg_config).await;
+
+        let user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
         let banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
         let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
         let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
@@ -44,13 +52,7 @@ impl TestApp {
             cors: CorsConfig {
                 allowed_origins: "http://localhost:8000".to_string(),
             },
-            postgres: PostgresConfig {
-                host: "test_host".to_string(),
-                username: "test_user".to_string(),
-                password: "test_password".to_string(),
-                db: "test_db".to_string(),
-                max_connections: 5,
-            },
+            postgres: pg_config.clone(),
         };
         let app = Application::build(app_state, config)
             .await
@@ -74,6 +76,8 @@ impl TestApp {
             banned_token_store,
             two_fa_code_store,
             email_client,
+            pg_config,
+            cleanup_called: false,
         }
     }
 
@@ -91,10 +95,6 @@ impl TestApp {
 
     pub async fn signup(&self, signup_body: &SignupRequest) -> reqwest::Response {
         self.post_impl("/signup", signup_body).await
-    }
-
-    pub async fn verify_2fa(&self, verify_2fa_body: &Verify2FARequest) -> reqwest::Response {
-        self.post_impl("/verify-2fa", verify_2fa_body).await
     }
 
     pub async fn post_signup<Body: Serialize>(&self, body: &Body) -> reqwest::Response {
@@ -132,4 +132,108 @@ impl TestApp {
             .await
             .expect("Failed to execute request.")
     }
+
+    pub async fn cleanup(&mut self) {
+        if !self.cleanup_called {
+            delete_database(&self.pg_config, &self.pg_config.db).await;
+            self.cleanup_called = true;
+        }
+    }
+}
+
+impl Drop for TestApp {
+    fn drop(&mut self) {
+        // We can't make this async, so we just log a warning if cleanup wasn't called.
+        if !self.cleanup_called {
+            eprintln!("Warning: TestApp was dropped without calling cleanup. Database may not have been deleted.");
+        }
+    }
+}
+
+fn load_test_pg_config() -> PostgresConfig {
+    use confique::Config;
+
+    // Best-effort .env load; env vars set in CI override.
+    let _ = dotenvy::dotenv();
+
+    let mut pg_config = PostgresConfig::builder()
+        .env()
+        .load()
+        .expect("Failed to load PostgresConfig from environment");
+    // Per-test database — overrides POSTGRES_DB so cleanup drops only the test db.
+    pg_config.db = Uuid::new_v4().to_string();
+    pg_config
+}
+
+async fn configure_postgresql(pg_config: &PostgresConfig) -> PgPool {
+    configure_database(pg_config).await;
+
+    get_postgres_pool(pg_config)
+        .await
+        .expect("Failed to create Postgres connection pool!")
+}
+
+async fn configure_database(pg_config: &PostgresConfig) {
+    // Create the per-test database via the admin (`postgres`) database.
+    let admin_url = pg_config.connection_string_with_db("postgres");
+    let admin_pool = PgPoolOptions::new()
+        .connect(&admin_url)
+        .await
+        .expect("Failed to create Postgres admin connection pool.");
+
+    admin_pool
+        .execute(format!(r#"CREATE DATABASE "{}";"#, pg_config.db).as_str())
+        .await
+        .expect("Failed to create database.");
+
+    // Migrate the new database.
+    let db_pool = PgPoolOptions::new()
+        .connect(&pg_config.connection_string())
+        .await
+        .expect("Failed to create per-test connection pool.");
+
+    sqlx::migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to migrate the database");
+}
+
+async fn delete_database(pg_config: &PostgresConfig, db_name: &str) {
+    // Connect to the default `postgres` admin database so we can drop the
+    // target database without holding a connection to it.
+    let postgresql_conn_url = pg_config.connection_string_with_db("postgres");
+
+    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
+        .expect("Failed to parse PostgreSQL connection string");
+
+    let mut connection = PgConnection::connect_with(&connection_options)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Kill active connections to the database
+    connection
+        .execute(
+            format!(
+                r#"
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{}'
+                  AND pid <> pg_backend_pid();
+        "#,
+                db_name
+            )
+            .as_str(),
+        )
+        .await
+        .expect("Failed to drop the database.");
+
+    // Drop the database
+    connection
+        .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
+        .await
+        .expect("Failed to drop the database.");
+}
+
+pub fn get_random_email() -> String {
+    SafeEmail().fake()
 }

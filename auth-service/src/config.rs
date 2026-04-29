@@ -41,7 +41,7 @@ impl CorsConfig {
     }
 }
 
-#[derive(Config, Debug)]
+#[derive(Config, Debug, Clone)]
 pub struct PostgresConfig {
     #[config(env = "POSTGRES_HOST", default = "localhost")]
     pub host: String,
@@ -57,9 +57,13 @@ pub struct PostgresConfig {
 
 impl PostgresConfig {
     pub fn connection_string(&self) -> String {
+        self.connection_string_with_db(&self.db)
+    }
+
+    pub fn connection_string_with_db(&self, db: &str) -> String {
         format!(
             "postgres://{}:{}@{}:5432/{}",
-            self.username, self.password, self.host, self.db
+            self.username, self.password, self.host, db
         )
     }
 }

@@ -2,5 +2,6 @@
 members = [
     "auth-service",
     "app-service",
+    "test-helpers",
 ]
 resolver = "2"

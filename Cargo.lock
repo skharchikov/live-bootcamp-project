@@ -165,6 +165,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "test-helpers",
  "tokio",
  "tower-http",
  "tracing",
@@ -2755,6 +2756,15 @@ checksum = "8e1d1b10ced5ca923a1fcb8d03e96b8d3268065d724548c0211415ff6ac6bac4"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "test-helpers"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
