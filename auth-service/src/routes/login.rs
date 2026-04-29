@@ -6,9 +6,7 @@ use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
-use crate::{
-    generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, TwoFACode,
-};
+use crate::{generate_auth_cookie, AuthAPIError, Email, EmailPayload, LoginAttemptId, TwoFACode};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
