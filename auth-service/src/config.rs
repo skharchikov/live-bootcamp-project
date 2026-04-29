@@ -12,6 +12,8 @@ pub struct AppConfig {
     pub cors: CorsConfig,
     #[config(nested)]
     pub postgres: PostgresConfig,
+    #[config(nested)]
+    pub redis: RedisConfig,
 }
 
 impl AppConfig {
@@ -65,5 +67,21 @@ impl PostgresConfig {
             "postgres://{}:{}@{}:5432/{}",
             self.username, self.password, self.host, db
         )
+    }
+}
+
+#[derive(Config, Debug, Clone)]
+pub struct RedisConfig {
+    #[config(env = "REDIS_HOST", default = "127.0.0.1")]
+    pub host: String,
+    #[config(env = "REDIS_PORT", default = 6379)]
+    pub port: u16,
+    #[config(env = "REDIS_PASSWORD")]
+    pub password: String,
+}
+
+impl RedisConfig {
+    pub fn connection_string(&self) -> String {
+        format!("redis://:{}@{}:{}", self.password, self.host, self.port)
     }
 }

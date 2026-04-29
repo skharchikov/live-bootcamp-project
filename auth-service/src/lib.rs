@@ -7,6 +7,7 @@ use axum::{
     serve::Serve,
     Json, Router,
 };
+use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -25,7 +26,7 @@ pub use utils::*;
 
 use crate::{
     app_state::AppState,
-    config::{AppConfig, PostgresConfig},
+    config::{AppConfig, PostgresConfig, RedisConfig},
 };
 
 // This struct encapsulates our application-related logic.
@@ -107,4 +108,8 @@ pub async fn get_postgres_pool(config: &PostgresConfig) -> Result<sqlx::PgPool, 
         .max_connections(config.max_connections.into())
         .connect(&config.connection_string())
         .await
+}
+
+pub fn get_redis_client(redis_config: &RedisConfig) -> RedisResult<Client> {
+    Client::open(redis_config.connection_string())
 }
