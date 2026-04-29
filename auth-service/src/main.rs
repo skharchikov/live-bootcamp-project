@@ -1,11 +1,12 @@
-use auth_service::config::{AppConfig, PostgresConfig};
-use auth_service::get_postgres_pool;
+use auth_service::config::{AppConfig, PostgresConfig, RedisConfig};
+use auth_service::{get_postgres_pool, get_redis_client};
+use redis::Connection;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::services::{
-    HashMapTwoFactorAuthCodeStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore,
+    HashMapTwoFactorAuthCodeStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore,
 };
 use auth_service::{app_state::AppState, Application};
 
@@ -24,9 +25,11 @@ async fn main() {
         "Configuration loaded"
     );
     let pg_pool = configure_postgresql(&config.postgres).await;
+    let redis_connection = Arc::new(RwLock::new(configure_redis(&config.redis).await));
 
     let rw_user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
-    let rw_banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
+    let rw_banned_token_store =
+        Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_connection)));
     let rw_two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
     let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
     let app_state = AppState::new(
@@ -59,4 +62,11 @@ async fn configure_postgresql(config: &PostgresConfig) -> PgPool {
         .expect("Failed to run database migrations");
 
     pg_pool
+}
+
+async fn configure_redis(config: &RedisConfig) -> Connection {
+    get_redis_client(config)
+        .expect("Failed to create Redis connection")
+        .get_connection()
+        .expect("Failed to connect to Redis")
 }

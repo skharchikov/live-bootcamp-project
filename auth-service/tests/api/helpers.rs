@@ -6,10 +6,10 @@ use uuid::Uuid;
 
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType, TwoFactorAuthCodeStoreType},
-    config::{AppConfig, CorsConfig, PostgresConfig},
-    get_postgres_pool,
+    config::{AppConfig, CorsConfig, PostgresConfig, RedisConfig},
+    get_postgres_pool, get_redis_client,
     services::{
-        HashMapTwoFactorAuthCodeStore, HashsetBannedTokenStore, MockEmailClient, PostgresUserStore,
+        HashMapTwoFactorAuthCodeStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore,
     },
     Application, LoginRequest, SignupRequest, VerifyTokenRequest,
 };
@@ -34,10 +34,13 @@ pub struct TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let pg_config = load_test_pg_config();
+        let redis_config = load_test_redis_config();
         let pg_pool = configure_postgresql(&pg_config).await;
+        let redis_connection = Arc::new(RwLock::new(configure_redis(&redis_config)));
 
         let user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
-        let banned_token_store = Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
+        let banned_token_store =
+            Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_connection)));
         let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
         let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
         let app_state = AppState::new(
@@ -53,6 +56,7 @@ impl TestApp {
                 allowed_origins: "http://localhost:8000".to_string(),
             },
             postgres: pg_config.clone(),
+            redis: redis_config,
         };
         let app = Application::build(app_state, config)
             .await
@@ -163,6 +167,24 @@ fn load_test_pg_config() -> PostgresConfig {
     // Per-test database — overrides POSTGRES_DB so cleanup drops only the test db.
     pg_config.db = Uuid::new_v4().to_string();
     pg_config
+}
+
+fn load_test_redis_config() -> RedisConfig {
+    use confique::Config;
+
+    let _ = dotenvy::dotenv();
+
+    RedisConfig::builder()
+        .env()
+        .load()
+        .expect("Failed to load RedisConfig from environment")
+}
+
+fn configure_redis(redis_config: &RedisConfig) -> redis::Connection {
+    get_redis_client(redis_config)
+        .expect("Failed to create Redis client")
+        .get_connection()
+        .expect("Failed to connect to Redis")
 }
 
 async fn configure_postgresql(pg_config: &PostgresConfig) -> PgPool {
