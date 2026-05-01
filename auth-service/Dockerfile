@@ -23,7 +23,7 @@ RUN cargo build --release --bin auth-service
 FROM debian:buster-slim AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/auth-service /usr/local/bin
-COPY --from=builder /app/assets /app/assets
+COPY --from=builder /app/auth-service/assets /app/assets
 ENV REDIS_HOST=redis
 ENV REDIS_PORT=6379
 ENTRYPOINT ["/usr/local/bin/auth-service"]
