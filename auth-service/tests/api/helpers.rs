@@ -1,7 +1,7 @@
 use reqwest::cookie::Jar;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::{RwLock, Semaphore};
 use uuid::Uuid;
 
 use auth_service::{
@@ -34,13 +34,64 @@ pub struct TestApp {
     pub email_client: Arc<RwLock<MockEmailClient>>,
     pub pg_config: PostgresConfig,
     pub cleanup_called: bool,
+    // Container handles owned by the test so their `Drop` runs while the
+    // tokio runtime is still alive — avoids leaking Docker containers on
+    // process exit.
+    _pg_container: ContainerAsync<PostgresImage>,
+    _redis_container: ContainerAsync<RedisImage>,
 }
+
+// Throttle concurrent container starts so the Docker daemon does not
+// thrash when the test harness fans out across many threads.
+static CONTAINER_START_SEM: Semaphore = Semaphore::const_new(4);
 
 impl TestApp {
     pub async fn new() -> Self {
-        let containers = shared_containers().await;
-        let pg_config = pg_config_for_test(containers);
-        let redis_config = redis_config_from(containers);
+        let _permit = CONTAINER_START_SEM
+            .acquire()
+            .await
+            .expect("Container start semaphore closed");
+        let pg_container = PostgresImage::default()
+            .start()
+            .await
+            .expect("Failed to start Postgres container");
+        let pg_host = pg_container
+            .get_host()
+            .await
+            .expect("Failed to read Postgres host")
+            .to_string();
+        let pg_port = pg_container
+            .get_host_port_ipv4(5432)
+            .await
+            .expect("Failed to read Postgres port");
+
+        let redis_container = RedisImage::default()
+            .start()
+            .await
+            .expect("Failed to start Redis container");
+        let redis_host = redis_container
+            .get_host()
+            .await
+            .expect("Failed to read Redis host")
+            .to_string();
+        let redis_port = redis_container
+            .get_host_port_ipv4(6379)
+            .await
+            .expect("Failed to read Redis port");
+
+        let pg_config = PostgresConfig {
+            host: pg_host,
+            port: pg_port,
+            username: "postgres".to_string(),
+            password: "postgres".to_string(),
+            db: Uuid::new_v4().to_string(),
+            max_connections: 5,
+        };
+        let redis_config = RedisConfig {
+            host: redis_host,
+            port: redis_port,
+            password: String::new(),
+        };
         let pg_pool = configure_postgresql(&pg_config).await;
         let redis_connection = Arc::new(RwLock::new(configure_redis(&redis_config)));
 
@@ -88,6 +139,8 @@ impl TestApp {
             email_client,
             pg_config,
             cleanup_called: false,
+            _pg_container: pg_container,
+            _redis_container: redis_container,
         }
     }
 
@@ -157,81 +210,6 @@ impl Drop for TestApp {
         if !self.cleanup_called {
             eprintln!("Warning: TestApp was dropped without calling cleanup. Database may not have been deleted.");
         }
-    }
-}
-
-pub struct TestContainers {
-    pg_host: String,
-    pg_port: u16,
-    redis_host: String,
-    redis_port: u16,
-    // Container handles kept alive for the duration of the test binary.
-    _pg: ContainerAsync<PostgresImage>,
-    _redis: ContainerAsync<RedisImage>,
-}
-
-static CONTAINERS: OnceCell<TestContainers> = OnceCell::const_new();
-
-async fn shared_containers() -> &'static TestContainers {
-    CONTAINERS
-        .get_or_init(|| async {
-            let pg = PostgresImage::default()
-                .start()
-                .await
-                .expect("Failed to start Postgres container");
-            let pg_host = pg
-                .get_host()
-                .await
-                .expect("Failed to read Postgres host")
-                .to_string();
-            let pg_port = pg
-                .get_host_port_ipv4(5432)
-                .await
-                .expect("Failed to read Postgres port");
-
-            let redis = RedisImage::default()
-                .start()
-                .await
-                .expect("Failed to start Redis container");
-            let redis_host = redis
-                .get_host()
-                .await
-                .expect("Failed to read Redis host")
-                .to_string();
-            let redis_port = redis
-                .get_host_port_ipv4(6379)
-                .await
-                .expect("Failed to read Redis port");
-
-            TestContainers {
-                pg_host,
-                pg_port,
-                redis_host,
-                redis_port,
-                _pg: pg,
-                _redis: redis,
-            }
-        })
-        .await
-}
-
-fn pg_config_for_test(c: &TestContainers) -> PostgresConfig {
-    PostgresConfig {
-        host: c.pg_host.clone(),
-        port: c.pg_port,
-        username: "postgres".to_string(),
-        password: "postgres".to_string(),
-        // Per-test database — cleanup drops only the test db.
-        db: Uuid::new_v4().to_string(),
-        max_connections: 5,
-    }
-}
-
-fn redis_config_from(c: &TestContainers) -> RedisConfig {
-    RedisConfig {
-        host: c.redis_host.clone(),
-        port: c.redis_port,
-        password: String::new(),
     }
 }
 
