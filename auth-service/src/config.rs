@@ -47,6 +47,8 @@ impl CorsConfig {
 pub struct PostgresConfig {
     #[config(env = "POSTGRES_HOST", default = "localhost")]
     pub host: String,
+    #[config(env = "POSTGRES_PORT", default = 5432)]
+    pub port: u16,
     #[config(env = "POSTGRES_USER")]
     pub username: String,
     #[config(env = "POSTGRES_PASSWORD")]
@@ -64,8 +66,8 @@ impl PostgresConfig {
 
     pub fn connection_string_with_db(&self, db: &str) -> String {
         format!(
-            "postgres://{}:{}@{}:5432/{}",
-            self.username, self.password, self.host, db
+            "postgres://{}:{}@{}:{}/{}",
+            self.username, self.password, self.host, self.port, db
         )
     }
 }

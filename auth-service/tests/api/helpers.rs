@@ -1,7 +1,7 @@
 use reqwest::cookie::Jar;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{OnceCell, RwLock};
 use uuid::Uuid;
 
 use auth_service::{
@@ -19,6 +19,11 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     Connection, Executor, PgConnection, PgPool,
 };
+use testcontainers_modules::{
+    postgres::Postgres as PostgresImage,
+    redis::Redis as RedisImage,
+    testcontainers::{runners::AsyncRunner, ContainerAsync},
+};
 
 pub struct TestApp {
     pub address: String,
@@ -33,8 +38,9 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let pg_config = load_test_pg_config();
-        let redis_config = load_test_redis_config();
+        let containers = shared_containers().await;
+        let pg_config = pg_config_for_test(containers);
+        let redis_config = redis_config_from(containers);
         let pg_pool = configure_postgresql(&pg_config).await;
         let redis_connection = Arc::new(RwLock::new(configure_redis(&redis_config)));
 
@@ -154,30 +160,79 @@ impl Drop for TestApp {
     }
 }
 
-fn load_test_pg_config() -> PostgresConfig {
-    use confique::Config;
-
-    // Best-effort .env load; env vars set in CI override.
-    let _ = dotenvy::dotenv();
-
-    let mut pg_config = PostgresConfig::builder()
-        .env()
-        .load()
-        .expect("Failed to load PostgresConfig from environment");
-    // Per-test database — overrides POSTGRES_DB so cleanup drops only the test db.
-    pg_config.db = Uuid::new_v4().to_string();
-    pg_config
+pub struct TestContainers {
+    pg_host: String,
+    pg_port: u16,
+    redis_host: String,
+    redis_port: u16,
+    // Container handles kept alive for the duration of the test binary.
+    _pg: ContainerAsync<PostgresImage>,
+    _redis: ContainerAsync<RedisImage>,
 }
 
-fn load_test_redis_config() -> RedisConfig {
-    use confique::Config;
+static CONTAINERS: OnceCell<TestContainers> = OnceCell::const_new();
 
-    let _ = dotenvy::dotenv();
+async fn shared_containers() -> &'static TestContainers {
+    CONTAINERS
+        .get_or_init(|| async {
+            let pg = PostgresImage::default()
+                .start()
+                .await
+                .expect("Failed to start Postgres container");
+            let pg_host = pg
+                .get_host()
+                .await
+                .expect("Failed to read Postgres host")
+                .to_string();
+            let pg_port = pg
+                .get_host_port_ipv4(5432)
+                .await
+                .expect("Failed to read Postgres port");
 
-    RedisConfig::builder()
-        .env()
-        .load()
-        .expect("Failed to load RedisConfig from environment")
+            let redis = RedisImage::default()
+                .start()
+                .await
+                .expect("Failed to start Redis container");
+            let redis_host = redis
+                .get_host()
+                .await
+                .expect("Failed to read Redis host")
+                .to_string();
+            let redis_port = redis
+                .get_host_port_ipv4(6379)
+                .await
+                .expect("Failed to read Redis port");
+
+            TestContainers {
+                pg_host,
+                pg_port,
+                redis_host,
+                redis_port,
+                _pg: pg,
+                _redis: redis,
+            }
+        })
+        .await
+}
+
+fn pg_config_for_test(c: &TestContainers) -> PostgresConfig {
+    PostgresConfig {
+        host: c.pg_host.clone(),
+        port: c.pg_port,
+        username: "postgres".to_string(),
+        password: "postgres".to_string(),
+        // Per-test database — cleanup drops only the test db.
+        db: Uuid::new_v4().to_string(),
+        max_connections: 5,
+    }
+}
+
+fn redis_config_from(c: &TestContainers) -> RedisConfig {
+    RedisConfig {
+        host: c.redis_host.clone(),
+        port: c.redis_port,
+        password: String::new(),
+    }
 }
 
 fn configure_redis(redis_config: &RedisConfig) -> redis::Connection {

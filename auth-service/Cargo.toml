@@ -40,3 +40,4 @@ validator = { version = "0.19.0", features = ["derive"] }
 fake = "4.4.0"
 reqwest = { version = "0.13.1", features = ["json", "form", "cookies"] }
 test-helpers = { path = "../test-helpers" }
+testcontainers-modules = { version = "0.14", features = ["postgres", "redis"] }
