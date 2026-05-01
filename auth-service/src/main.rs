@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use auth_service::services::{
-    HashMapTwoFactorAuthCodeStore, MockEmailClient, PostgresUserStore, RedisBannedTokenStore,
+    MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFactorAuthCodeStore,
 };
 use auth_service::{app_state::AppState, Application};
 
@@ -28,8 +28,12 @@ async fn main() {
     let redis_connection = Arc::new(RwLock::new(configure_redis(&config.redis).await));
 
     let rw_user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
-    let rw_banned_token_store = Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_connection)));
-    let rw_two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFactorAuthCodeStore::default()));
+    let rw_banned_token_store = Arc::new(RwLock::new(RedisBannedTokenStore::new(
+        redis_connection.clone(),
+    )));
+    let rw_two_fa_code_store = Arc::new(RwLock::new(RedisTwoFactorAuthCodeStore::new(
+        redis_connection.clone(),
+    )));
     let email_client = Arc::new(RwLock::new(MockEmailClient::default()));
     let app_state = AppState::new(
         rw_user_store,
