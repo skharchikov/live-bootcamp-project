@@ -61,8 +61,8 @@ impl TwoFactorAuthCodeStore for RedisTwoFactorAuthCodeStore {
 
         let login_attempt_id = LoginAttemptId::parse(&login_attempt_id)
             .map_err(|_| TwoFactorAuthCodeStoreError::UnexpectedError)?;
-        let code = TwoFACode::parse(&code)
-            .map_err(|_| TwoFactorAuthCodeStoreError::UnexpectedError)?;
+        let code =
+            TwoFACode::parse(&code).map_err(|_| TwoFactorAuthCodeStoreError::UnexpectedError)?;
 
         Ok((login_attempt_id, code))
     }
